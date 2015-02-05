@@ -160,7 +160,7 @@ var attachUserField = {
   username: function(u, o) {
     o.username = (u.name + '@' + u.domain).toLowerCase();
   },
-  
+
   'emails.address': function(u, o) {
     o.emails = [
       {address: (u.name + '@' + u.domain).toLowerCase(), validated: false}
@@ -244,7 +244,7 @@ Fake.paragraph = function(length) {
 
 
 
-Fake.fromArray = function(array) {  
+Fake.fromArray = function(array) {
   return randomElement(array);
 };
 
@@ -252,8 +252,62 @@ Fake.color = function() {
   return randomElement(colors);
 };
 
+Fake.doc = function(schema, options){
 
+  if(!(schema instanceof SimpleSchema)) throw new Meteor.Error('cant generate fake doc', schema + ' isnt SimpleSchema instance');
+  options = options || {};
+  var result = {};
+  var keys = schema._schemaKeys;
+  _.each(keys, function(key){
+    var fields = key.split('.');
+    parent = result;
+    current = '';
+    _.each(fields,function(field){
+      current = current ? current + '.'+field : field;
+      if(!parent[field]){
+        parent[field] = {};
+        parent = parent[field];
+      }else{
+        parent = parent[field];
+      }
+    })
+  });
+  _.each(schema._schemaKeys, function(key){
+    current = result;
+    var fields = key.split('.');
+    _.each(fields,function(field){
+      current = current[field];
+      if(Object.keys(current).length === 0){
+        assign(result,key, fakeValue(schema._schema[key]),options);
+      }
+    });
+  });
+  return result;
+};
 
+function assign(obj, prop, value) {
+  if (typeof prop === "string")
+    prop = prop.split(".");
 
+  if (prop.length > 1) {
+    var e = prop.shift();
+    assign(obj[e] =
+      Object.prototype.toString.call(obj[e]) === "[object Object]"
+      ? obj[e]
+      : {},
+      prop,
+      value);
+  } else
+      obj[prop[0]] = value;
+}
 
-
+function fakeValue(pattern,options){
+  switch(typeof pattern.type()){
+    case 'number' :
+      return Math.floor((Math.random() * 100) + 1);
+    case 'string' :
+      return Fake.word();
+    case 'boolean' :
+      return (Math.floor((Math.random() * 2) + 1) == 1 ? true : false) ;
+  }
+};
