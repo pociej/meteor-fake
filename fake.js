@@ -138,6 +138,9 @@ var randomElement = function(array) {
   return array[Math.floor(Math.random() * array.length)];
 };
 
+var randomString = function(min,max){
+  return Math.random().toString(36).substr(2, Math.floor(Math.random()*(max-min+1))+min);
+}; 
 
 var attachUserField = {
 
@@ -318,7 +321,13 @@ Fake.user = function(params) {
   }
 
   function fakeArray(schema,path,options){
-    var pattern = schema._schema[path+'.$'], result = [];
+
+    var pattern     = schema._schema[path+'.$'],
+        minCount    = pattern.minCount || 1,
+        maxCount    = pattern.maxCount || 10,
+        arrayLength = Math.floor((Math.random() * maxCount) + minCount),
+        result      = [];
+
     var arrayLength = Math.floor((Math.random() * 6) + 1) ;
     if(typeof pattern.type() === 'object'){
       for(var i = 0 ; i < arrayLength ; i++){
@@ -334,12 +343,18 @@ Fake.user = function(params) {
 
   function fakeValue(pattern,options){
     options = options || {};
+    var min = pattern.min ,
+        max = pattern.max;
     switch(typeof pattern.type()){
       case 'number' :
-        return Math.floor((Math.random() * 100) + 1);
+        max = max ? max : 100;
+        min = min ? min : 1;
+        return Math.floor((Math.random() * max) + min);
       case 'string' :
-        return Fake.word();
+        max = max ? max : 10;
+        min = min ? min : 3;
+        return randomString(min,max);
       case 'boolean' :
         return (Math.floor((Math.random() * 2) + 1) == 1 ? true : false) ;
     }
-  };
+ };
