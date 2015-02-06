@@ -140,7 +140,7 @@ var randomElement = function(array) {
 
 var randomString = function(min,max){
   return Math.random().toString(36).substr(2, Math.floor(Math.random()*(max-min+1))+min);
-}; 
+};
 
 var attachUserField = {
 
@@ -258,10 +258,15 @@ Fake.user = function(params) {
   Fake.doc = function(schema, options, begining){
     if(!(schema instanceof SimpleSchema)) throw new Meteor.Error('cant generate fake doc', schema + ' isnt SimpleSchema instance');
     options = options || {};
-    begining = begining || ''
+    begining = begining || '';
+    skipReminder  = {};
+
     var reminder,result = {};
     var keys = _.filter(schema._schemaKeys,function(key){return key.indexOf(begining) === 0});
+
     _.each(keys, function(key){
+      var path = begining;
+      path = path.substring(0, path.length - 1);
       if(begining) key = key.replace(begining, '');
       var fields = key.split('.');
       var breakCheck = false;
@@ -271,15 +276,25 @@ Fake.user = function(params) {
           breakCheck = true;
           return;
         }
-        if(!reminder[field]){
-          reminder[field] = {};
-          reminder = reminder[field];
-        }else{
-          if(fields[index+1] === '$') reminder[field] = [];
-          reminder = reminder[field];
+        path = path ? path +'.'+field : path+field;
+        //optional fields skipper
+        if(!options.setOptionalFields && schema._schema[path].optional && skipReminder[path] === undefined){
+          var skip =(options.setOptionalFields === false) ? true : Math.floor(2*Math.random());
+          skipReminder[path] = skip;
+          if(skip){breakCheck = true; return};
         }
+        if(skipReminder[path]){breakCheck = true;  return };
+        if(!reminder[field]){
+          if( fields[index+1] !== '$'){
+            reminder[field] = {}
+          }
+        }else if(fields[index+1] === '$'){
+          reminder[field] = []
+        }
+        reminder = reminder[field];
       });
     });
+
     _.each(keys, function(key){
       if(begining) key = key.replace(begining, '');
       var path = begining;
@@ -294,11 +309,14 @@ Fake.user = function(params) {
         }
         path = path ? path +'.'+field : path+field;
         current = current[field];
-        if(begining) console.log("path",path,current);
-        if(current instanceof Array && current.length === 0){
-          assign(result,key, fakeArray(schema,path,options));
-        }else if(Object.keys(current).length === 0){
-          assign(result,key, fakeValue(schema._schema[path],options));
+        if(current){
+          if(current instanceof Array && current.length === 0){
+            assign(result,key, fakeArray(schema,path,options));
+          }else if(Object.keys(current).length === 0){
+            assign(result,key, fakeValue(schema._schema[path],options));
+          }
+        }else{
+          breakCheck = true;
         }
       });
     });
@@ -306,29 +324,29 @@ Fake.user = function(params) {
   };
 
   function assign(obj, prop, value) {
-    if (typeof prop === "string")
-      prop = prop.split(".");
+  if (typeof prop === "string")
+    prop = prop.split(".");
     if (prop.length > 1) {
       var e = prop.shift();
       assign(obj[e] =
-      Object.prototype.toString.call(obj[e]) === "[object Object]"
-      ? obj[e]
-      : {},
-      prop,
-      value);
-    } else
-        obj[prop[0]] = value;
+        Object.prototype.toString.call(obj[e]) === "[object Object]"
+        ? obj[e]
+        : {},
+        prop,
+        value);
+      } else {
+          obj[prop[0]] = value;
+      }
   }
 
   function fakeArray(schema,path,options){
 
     var pattern     = schema._schema[path+'.$'],
-        minCount    = pattern.minCount || 1,
-        maxCount    = pattern.maxCount || 10,
-        arrayLength = Math.floor((Math.random() * maxCount) + minCount),
-        result      = [];
+    minCount    = pattern.minCount || 1,
+    maxCount    = pattern.maxCount || 10,
+    arrayLength = Math.floor((Math.random() * (1+maxCount-minCount)) + minCount),
+    result      = [];
 
-    var arrayLength = Math.floor((Math.random() * 6) + 1) ;
     if(typeof pattern.type() === 'object'){
       for(var i = 0 ; i < arrayLength ; i++){
         result.push(Fake.doc(schema, options,path+'.$.'));
@@ -344,7 +362,13 @@ Fake.user = function(params) {
   function fakeValue(pattern,options){
     options = options || {};
     var min = pattern.min ,
-        max = pattern.max;
+    max = pattern.max;
+
+    if(options.defaultValues && pattern.defaultValue){
+      return defaultValue;
+    }
+
+
     switch(typeof pattern.type()){
       case 'number' :
         max = max ? max : 100;
@@ -357,4 +381,4 @@ Fake.user = function(params) {
       case 'boolean' :
         return (Math.floor((Math.random() * 2) + 1) == 1 ? true : false) ;
     }
- };
+  };
